@@ -1,0 +1,24 @@
+{
+  "id": "7-segment-clock",
+  "name": "7-Segment Clock",
+  "version": "1.0.0",
+  "description": "Display a retro-style 7-segment clock with sunrise/sunset color transitions",
+  "author": "LEDMatrix",
+  "entry_point": "manager.py",
+  "class_name": "SevenSegmentClockPlugin",
+  "display_modes": [
+    "7-segment-clock"
+  ],
+  "category": "time",
+  "tags": [
+    "clock",
+    "time",
+    "retro",
+    "7-segment",
+    "display"
+  ],
+  "update_interval": 60,
+  "default_duration": 15,
+  "config_schema": "config_schema.json"
+}
+

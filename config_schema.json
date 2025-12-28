@@ -1,0 +1,89 @@
+{
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "title": "Enable Plugin",
+      "description": "Enable or disable the 7-segment clock plugin"
+    },
+    "display_duration": {
+      "type": "number",
+      "default": 15,
+      "minimum": 5,
+      "maximum": 300,
+      "title": "Display Duration",
+      "description": "How long to display the clock (seconds)"
+    },
+    "location": {
+      "type": "object",
+      "title": "Location",
+      "description": "Location for sunrise/sunset calculations",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "default": 37.541290,
+          "title": "Latitude",
+          "description": "Latitude coordinate for location"
+        },
+        "lng": {
+          "type": "number",
+          "default": -77.434769,
+          "title": "Longitude",
+          "description": "Longitude coordinate for location"
+        },
+        "timezone": {
+          "type": "string",
+          "default": "US/Eastern",
+          "title": "Timezone",
+          "description": "Timezone string (e.g., US/Eastern, UTC)"
+        },
+        "locality": {
+          "type": "string",
+          "default": "Richmond, VA",
+          "title": "Locality",
+          "description": "Human-readable location name"
+        }
+      }
+    },
+    "is_24_hour_format": {
+      "type": "boolean",
+      "default": true,
+      "title": "24 Hour Format",
+      "description": "Display time in 24-hour format (false for 12-hour format)"
+    },
+    "has_leading_zero": {
+      "type": "boolean",
+      "default": false,
+      "title": "Leading Zero",
+      "description": "Show leading zero for hours (e.g., 09:30 instead of 9:30)"
+    },
+    "has_flashing_separator": {
+      "type": "boolean",
+      "default": true,
+      "title": "Flashing Separator",
+      "description": "Enable blinking separator (colon) between hours and minutes"
+    },
+    "color_daytime": {
+      "type": "string",
+      "default": "#FFFFFF",
+      "title": "Daytime Color",
+      "description": "Hex color code for daytime display (e.g., #FFFFFF for white)"
+    },
+    "color_nighttime": {
+      "type": "string",
+      "default": "#FFFFFF",
+      "title": "Nighttime Color",
+      "description": "Hex color code for nighttime display (e.g., #FFFFFF for white)"
+    },
+    "min_fade_elevation": {
+      "type": "string",
+      "default": "-1",
+      "title": "Fade During",
+      "description": "Sun elevation threshold for color mixing",
+      "enum": ["-1", "-6", "-12", "-18"],
+      "enumNames": ["None", "Civil twilight", "Nautical twilight", "Astronomical twilight"]
+    }
+  }
+}
+
