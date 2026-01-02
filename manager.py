@@ -241,7 +241,7 @@ class SevenSegmentClockPlugin(BasePlugin):
         return f"{hour_str}:{minute_str}", separator_visible
 
     def _render_digit(
-        self, digit: int, color: Tuple[int, int, int]
+        self, digit: int, color: Tuple[int, int, int], scale: float = 1.0
     ) -> Optional[Image.Image]:
         """
         Render a single digit with the specified color.
@@ -249,6 +249,7 @@ class SevenSegmentClockPlugin(BasePlugin):
         Args:
             digit: Digit to render (0-9)
             color: RGB color tuple
+            scale: Scale factor to apply to the image (default: 1.0)
 
         Returns:
             PIL Image with colored digit, or None if error
@@ -281,16 +282,32 @@ class SevenSegmentClockPlugin(BasePlugin):
                 else:
                     colored_image.putpixel((x, y), pixel)
 
+        # Scale the image if needed
+        if scale != 1.0:
+            new_width = int(colored_image.width * scale)
+            new_height = int(colored_image.height * scale)
+            try:
+                # Try new PIL API first
+                colored_image = colored_image.resize(
+                    (new_width, new_height), Image.Resampling.LANCZOS
+                )
+            except AttributeError:
+                # Fall back to old PIL API
+                colored_image = colored_image.resize(
+                    (new_width, new_height), Image.LANCZOS
+                )
+
         return colored_image
 
     def _render_separator(
-        self, color: Tuple[int, int, int]
+        self, color: Tuple[int, int, int], scale: float = 1.0
     ) -> Optional[Image.Image]:
         """
         Render the separator (colon) with the specified color.
 
         Args:
             color: RGB color tuple
+            scale: Scale factor to apply to the image (default: 1.0)
 
         Returns:
             PIL Image with colored separator, or None if error
@@ -315,6 +332,21 @@ class SevenSegmentClockPlugin(BasePlugin):
                         colored_image.putpixel((x, y), pixel)
                 else:
                     colored_image.putpixel((x, y), pixel)
+
+        # Scale the image if needed
+        if scale != 1.0:
+            new_width = int(colored_image.width * scale)
+            new_height = int(colored_image.height * scale)
+            try:
+                # Try new PIL API first
+                colored_image = colored_image.resize(
+                    (new_width, new_height), Image.Resampling.LANCZOS
+                )
+            except AttributeError:
+                # Fall back to old PIL API
+                colored_image = colored_image.resize(
+                    (new_width, new_height), Image.LANCZOS
+                )
 
         return colored_image
 
@@ -359,6 +391,46 @@ class SevenSegmentClockPlugin(BasePlugin):
             self.current_time = datetime.now(self.timezone)
             self.current_color = self.color_daytime
 
+    def _calculate_scale_factor(
+        self, display_width: int, display_height: int, digits: list
+    ) -> float:
+        """
+        Calculate the optimal scale factor to fit the clock on the display.
+
+        Args:
+            display_width: Display width in pixels
+            display_height: Display height in pixels
+            digits: List of digits/separators to display
+
+        Returns:
+            Scale factor (1.0 = no scaling, >1.0 = scale up, <1.0 = scale down)
+        """
+        # Calculate base width needed for the time string
+        base_width = 0
+        for item in digits:
+            if item == ":":
+                base_width += self.separator_width
+            elif item is not None:
+                base_width += self.digit_width
+
+        base_height = self.digit_height
+
+        # Calculate scale factors for width and height
+        # Leave some padding (5% on each side = 90% of display)
+        available_width = display_width * 0.9
+        available_height = display_height * 0.9
+
+        scale_width = available_width / base_width if base_width > 0 else 1.0
+        scale_height = available_height / base_height if base_height > 0 else 1.0
+
+        # Use the smaller scale to ensure everything fits
+        scale = min(scale_width, scale_height)
+
+        # Don't scale down below 0.5x or up beyond 3x to maintain readability
+        scale = max(0.5, min(3.0, scale))
+
+        return scale
+
     def display(self, force_clear: bool = False) -> None:
         """Render the 7-segment clock display."""
         try:
@@ -387,40 +459,54 @@ class SevenSegmentClockPlugin(BasePlugin):
                 elif char.isdigit():
                     digits.append(int(char))
 
-            # Calculate width: each digit is digit_width, separator is separator_width
+            # Safety check: ensure we have at least some digits to display
+            if not any(item is not None for item in digits):
+                self.logger.warning("No digits to display, skipping render")
+                return
+
+            # Calculate optimal scale factor to fit the display
+            scale = self._calculate_scale_factor(display_width, display_height, digits)
+
+            # Calculate scaled dimensions
+            scaled_digit_width = int(self.digit_width * scale)
+            scaled_digit_height = int(self.digit_height * scale)
+            scaled_separator_width = int(self.separator_width * scale)
+            scaled_separator_height = int(self.separator_height * scale)
+
+            # Calculate total width with scaling
             total_width = 0
             for item in digits:
                 if item == ":":
-                    total_width += self.separator_width
+                    total_width += scaled_separator_width
                 elif item is not None:
-                    total_width += self.digit_width
+                    total_width += scaled_digit_width
 
             # Calculate starting X position to center the display
             start_x = (display_width - total_width) // 2
             # Center vertically
-            start_y = (display_height - self.digit_height) // 2
+            start_y = (display_height - scaled_digit_height) // 2
 
-            # Render each digit/separator
+            # Render each digit/separator with scaling
             current_x = start_x
             for item in digits:
                 if item == ":":
                     # Render separator
-                    sep_img = self._render_separator(self.current_color)
+                    sep_img = self._render_separator(self.current_color, scale)
                     if sep_img:
                         # Paste onto display image
-                        paste_y = start_y + (self.digit_height - self.separator_height) // 2
+                        paste_y = start_y + (scaled_digit_height - scaled_separator_height) // 2
                         self.display_manager.image.paste(
                             sep_img, (current_x, paste_y), sep_img
                         )
-                        current_x += self.separator_width
+                        current_x += scaled_separator_width
                 elif item is not None:
                     # Render digit
-                    digit_img = self._render_digit(item, self.current_color)
+                    digit_img = self._render_digit(item, self.current_color, scale)
                     if digit_img:
                         self.display_manager.image.paste(
                             digit_img, (current_x, start_y), digit_img
                         )
-                        current_x += self.digit_width
+                        current_x += scaled_digit_width
 
             # Update the display
             self.display_manager.update_display()
