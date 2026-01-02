@@ -2,7 +2,7 @@
 7-Segment Clock Plugin for LEDMatrix
 
 Displays a retro-style 7-segment clock with configurable time formats
-and sunrise/sunset-based color transitions.
+and customizable colors.
 """
 
 import os
@@ -11,15 +11,12 @@ from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 import pytz
 from PIL import Image, ImageDraw
-from astral import LocationInfo
-from astral.sun import elevation
-from astral import Observer
 
 from src.plugin_system.base_plugin import BasePlugin
 
 
 class SevenSegmentClockPlugin(BasePlugin):
-    """7-segment clock plugin with sunrise/sunset color transitions."""
+    """7-segment clock plugin with customizable colors."""
 
     def __init__(
         self,
@@ -41,12 +38,9 @@ class SevenSegmentClockPlugin(BasePlugin):
         self.is_24_hour_format = config.get("is_24_hour_format", True)
         self.has_leading_zero = config.get("has_leading_zero", False)
         self.has_flashing_separator = config.get("has_flashing_separator", True)
-        self.color_daytime = self._hex_to_rgb(config.get("color_daytime", "#FFFFFF"))
-        self.color_nighttime = self._hex_to_rgb(config.get("color_nighttime", "#FFFFFF"))
-        self.min_fade_elevation = int(config.get("min_fade_elevation", "-1"))
+        self.color = self._hex_to_rgb(config.get("color", "#FFFFFF"))
 
-        # Initialize location and timezone
-        self._init_location()
+        # Initialize timezone
         self._init_timezone()
 
         # Load digit and separator images
@@ -55,8 +49,6 @@ class SevenSegmentClockPlugin(BasePlugin):
 
         # State variables (updated in update(), used in display())
         self.current_time: Optional[datetime] = None
-        self.current_color: Tuple[int, int, int] = self.color_daytime
-        self.sun_elevation: float = 0.0
 
         # Image dimensions (from loaded images)
         self.digit_width = 13
@@ -65,21 +57,6 @@ class SevenSegmentClockPlugin(BasePlugin):
         self.separator_height = 14
 
         self.logger.info("7-segment clock plugin initialized")
-
-    def _init_location(self) -> None:
-        """Initialize location for sunrise/sunset calculations."""
-        lat = self.location_config.get("lat", 37.541290)
-        lng = self.location_config.get("lng", -77.434769)
-        locality = self.location_config.get("locality", "Richmond, VA")
-
-        self.location = LocationInfo(
-            name=locality,
-            region="",
-            timezone="UTC",  # Timezone handled separately
-            latitude=lat,
-            longitude=lng,
-        )
-        self.observer = Observer(lat, lng)
 
     def _init_timezone(self) -> None:
         """Initialize timezone from config or system default."""
@@ -143,70 +120,6 @@ class SevenSegmentClockPlugin(BasePlugin):
     def _rgb_to_hex(self, r: int, g: int, b: int) -> str:
         """Convert RGB tuple to hex color string."""
         return f"#{r:02x}{g:02x}{b:02x}"
-
-    def _mix_colors(
-        self, color1: Tuple[int, int, int], color2: Tuple[int, int, int], percentage: float
-    ) -> Tuple[int, int, int]:
-        """
-        Mix two colors by a given percentage.
-
-        Args:
-            color1: First color (RGB tuple)
-            color2: Second color (RGB tuple)
-            percentage: Percentage of color1 in mix (0.0-1.0)
-
-        Returns:
-            Mixed color as RGB tuple
-        """
-        r1, g1, b1 = color1
-        r2, g2, b2 = color2
-
-        r = int(r1 * percentage + r2 * (1 - percentage))
-        g = int(g1 * percentage + g2 * (1 - percentage))
-        b = int(b1 * percentage + b2 * (1 - percentage))
-
-        return (r, g, b)
-
-    def _proportion_within_range(self, min_value: float, max_value: float, x: float) -> float:
-        """
-        Calculate the proportion of x within the range [min_value, max_value],
-        clamped between 0 and 1.
-
-        Args:
-            min_value: Minimum value of the range
-            max_value: Maximum value of the range
-            x: Value to calculate proportion for
-
-        Returns:
-            Proportion between 0 and 1
-        """
-        if min_value == max_value:
-            return float(x >= min_value)
-
-        proportion = (x - min_value) / (max_value - min_value)
-        return max(0.0, min(1.0, proportion))
-
-    def _get_sun_elevation(self, dt: datetime) -> float:
-        """
-        Calculate sun elevation at given datetime.
-
-        Args:
-            dt: Datetime object (should be timezone-aware)
-
-        Returns:
-            Sun elevation in degrees
-        """
-        try:
-            # Convert to UTC for astral calculations
-            if dt.tzinfo is None:
-                dt = self.timezone.localize(dt)
-            dt_utc = dt.astimezone(pytz.UTC)
-            
-            elev = elevation(self.observer, dt_utc)
-            return elev
-        except Exception as e:
-            self.logger.error(f"Error calculating sun elevation: {e}")
-            return 0.0
 
     def _format_time(self, dt: datetime) -> Tuple[str, bool]:
         """
@@ -351,45 +264,20 @@ class SevenSegmentClockPlugin(BasePlugin):
         return colored_image
 
     def update(self) -> None:
-        """Update current time, sun elevation, and target color."""
+        """Update current time."""
         try:
             # Get current time in configured timezone
             now_utc = datetime.now(pytz.UTC)
             self.current_time = now_utc.astimezone(self.timezone)
 
-            # Calculate sun elevation
-            self.sun_elevation = self._get_sun_elevation(self.current_time)
-
-            # Calculate color based on sun elevation
-            # Mix between daytime and nighttime colors
-            max_elevation = -1.0  # Default max elevation
-            min_elevation = float(self.min_fade_elevation)
-
-            if min_elevation == max_elevation:
-                # No fading - use daytime color if sun is up, nighttime if down
-                if self.sun_elevation >= max_elevation:
-                    self.current_color = self.color_daytime
-                else:
-                    self.current_color = self.color_nighttime
-            else:
-                # Fade between colors based on elevation
-                proportion = self._proportion_within_range(
-                    min_elevation, max_elevation, self.sun_elevation
-                )
-                self.current_color = self._mix_colors(
-                    self.color_daytime, self.color_nighttime, proportion
-                )
-
             self.logger.debug(
-                f"Updated: time={self.current_time.strftime('%H:%M:%S')}, "
-                f"elevation={self.sun_elevation:.1f}°, color={self.current_color}"
+                f"Updated: time={self.current_time.strftime('%H:%M:%S')}"
             )
 
         except Exception as e:
             self.logger.error(f"Error in update(): {e}", exc_info=True)
-            # Fallback to current time and default color
+            # Fallback to current time
             self.current_time = datetime.now(self.timezone)
-            self.current_color = self.color_daytime
 
     def _calculate_scale_factor(
         self, display_width: int, display_height: int, digits: list
@@ -491,7 +379,7 @@ class SevenSegmentClockPlugin(BasePlugin):
             for item in digits:
                 if item == ":":
                     # Render separator
-                    sep_img = self._render_separator(self.current_color, scale)
+                    sep_img = self._render_separator(self.color, scale)
                     if sep_img:
                         # Paste onto display image
                         paste_y = start_y + (scaled_digit_height - scaled_separator_height) // 2
@@ -501,7 +389,7 @@ class SevenSegmentClockPlugin(BasePlugin):
                         current_x += scaled_separator_width
                 elif item is not None:
                     # Render digit
-                    digit_img = self._render_digit(item, self.current_color, scale)
+                    digit_img = self._render_digit(item, self.color, scale)
                     if digit_img:
                         self.display_manager.image.paste(
                             digit_img, (current_x, start_y), digit_img
@@ -525,26 +413,19 @@ class SevenSegmentClockPlugin(BasePlugin):
 
     def validate_config(self) -> bool:
         """Validate plugin configuration."""
-        # Check location
+        # Check color
+        color = self.config.get("color", "#FFFFFF")
+        if not isinstance(color, str) or not color.startswith("#"):
+            self.logger.warning("color should be a hex color (e.g., #FFFFFF)")
+
+        # Check timezone if location config is provided
         location = self.config.get("location", {})
-        if not isinstance(location, dict):
-            self.logger.error("Location must be an object")
-            return False
-
-        lat = location.get("lat")
-        lng = location.get("lng")
-        if lat is not None and (not isinstance(lat, (int, float)) or lat < -90 or lat > 90):
-            self.logger.error("Latitude must be between -90 and 90")
-            return False
-        if lng is not None and (not isinstance(lng, (int, float)) or lng < -180 or lng > 180):
-            self.logger.error("Longitude must be between -180 and 180")
-            return False
-
-        # Check colors
-        for color_key in ["color_daytime", "color_nighttime"]:
-            color = self.config.get(color_key, "#FFFFFF")
-            if not isinstance(color, str) or not color.startswith("#"):
-                self.logger.warning(f"{color_key} should be a hex color (e.g., #FFFFFF)")
+        if isinstance(location, dict) and "timezone" in location:
+            timezone_str = location.get("timezone")
+            try:
+                pytz.timezone(timezone_str)
+            except pytz.exceptions.UnknownTimeZoneError:
+                self.logger.warning(f"Unknown timezone '{timezone_str}', will use UTC")
 
         return True
 

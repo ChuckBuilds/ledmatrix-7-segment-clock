@@ -156,37 +156,11 @@ Centering calculations ensure the clock is properly positioned regardless of dis
 
 ## Troubleshooting
 
-### Missing Dependencies Error (ModuleNotFoundError: No module named 'astral')
-
-If you see an error like `No module named 'astral'`, the plugin dependencies weren't installed automatically. Install them manually:
-
-```bash
-# If plugin is in plugin-repos directory:
-pip3 install --break-system-packages -r /home/devpi/LEDMatrix/plugin-repos/7-segment-clock/requirements.txt
-
-# Or if plugin is in plugins directory:
-pip3 install --break-system-packages -r /home/devpi/LEDMatrix/plugins/7-segment-clock/requirements.txt
-```
-
-After installing dependencies, restart the LEDMatrix service:
-```bash
-sudo systemctl restart ledmatrix
-```
-
-To force reinstallation of dependencies, remove the marker file:
-```bash
-# Remove dependency marker to force reinstall
-rm /home/devpi/LEDMatrix/plugin-repos/7-segment-clock/.dependencies_installed
-# Then restart the service
-sudo systemctl restart ledmatrix
-```
-
 ### Clock Not Displaying
 
 1. Check that the plugin is enabled in `config/config.json`
 2. Verify images are present in `assets/images/` directory
 3. Check plugin logs for errors: `journalctl -u ledmatrix -f` (if running as service)
-4. Ensure dependencies are installed (see "Missing Dependencies Error" above)
 
 ### Wrong Time Displayed
 

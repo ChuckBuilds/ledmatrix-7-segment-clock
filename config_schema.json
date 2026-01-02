@@ -18,31 +18,13 @@
     "location": {
       "type": "object",
       "title": "Location",
-      "description": "Location for sunrise/sunset calculations",
+      "description": "Location settings (timezone only, for time display)",
       "properties": {
-        "lat": {
-          "type": "number",
-          "default": 37.541290,
-          "title": "Latitude",
-          "description": "Latitude coordinate for location"
-        },
-        "lng": {
-          "type": "number",
-          "default": -77.434769,
-          "title": "Longitude",
-          "description": "Longitude coordinate for location"
-        },
         "timezone": {
           "type": "string",
           "default": "US/Eastern",
           "title": "Timezone",
           "description": "Timezone string (e.g., US/Eastern, UTC)"
-        },
-        "locality": {
-          "type": "string",
-          "default": "Richmond, VA",
-          "title": "Locality",
-          "description": "Human-readable location name"
         }
       }
     },
@@ -64,25 +46,11 @@
       "title": "Flashing Separator",
       "description": "Enable blinking separator (colon) between hours and minutes"
     },
-    "color_daytime": {
+    "color": {
       "type": "string",
       "default": "#FFFFFF",
-      "title": "Daytime Color",
-      "description": "Hex color code for daytime display (e.g., #FFFFFF for white)"
-    },
-    "color_nighttime": {
-      "type": "string",
-      "default": "#FFFFFF",
-      "title": "Nighttime Color",
-      "description": "Hex color code for nighttime display (e.g., #FFFFFF for white)"
-    },
-    "min_fade_elevation": {
-      "type": "string",
-      "default": "-1",
-      "title": "Fade During",
-      "description": "Sun elevation threshold for color mixing",
-      "enum": ["-1", "-6", "-12", "-18"],
-      "enumNames": ["None", "Civil twilight", "Nautical twilight", "Astronomical twilight"]
+      "title": "Color",
+      "description": "Hex color code for clock display (e.g., #FFFFFF for white, #FF0000 for red)"
     }
   }
 }
