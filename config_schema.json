@@ -18,13 +18,12 @@
     "location": {
       "type": "object",
       "title": "Location",
-      "description": "Location settings (timezone only, for time display)",
+      "description": "Location settings (optional - inherits from main LEDMatrix config if not specified)",
       "properties": {
         "timezone": {
           "type": "string",
-          "default": "US/Eastern",
           "title": "Timezone",
-          "description": "Timezone string (e.g., US/Eastern, UTC)"
+          "description": "Timezone string (e.g., US/Eastern, UTC). If not specified, inherits from main LEDMatrix timezone setting."
         }
       }
     },

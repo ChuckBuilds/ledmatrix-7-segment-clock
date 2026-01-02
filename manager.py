@@ -34,13 +34,12 @@ class SevenSegmentClockPlugin(BasePlugin):
         self.assets_dir = self.plugin_dir / "assets" / "images"
 
         # Load configuration
-        self.location_config = config.get("location", {})
         self.is_24_hour_format = config.get("is_24_hour_format", True)
         self.has_leading_zero = config.get("has_leading_zero", False)
         self.has_flashing_separator = config.get("has_flashing_separator", True)
         self.color = self._hex_to_rgb(config.get("color", "#FFFFFF"))
 
-        # Initialize timezone
+        # Initialize timezone (inherits from main config if not specified)
         self._init_timezone()
 
         # Load digit and separator images
@@ -59,13 +58,36 @@ class SevenSegmentClockPlugin(BasePlugin):
         self.logger.info("7-segment clock plugin initialized")
 
     def _init_timezone(self) -> None:
-        """Initialize timezone from config or system default."""
-        timezone_str = self.location_config.get("timezone", "US/Eastern")
+        """Initialize timezone from plugin config, main config, or system default."""
+        # First check plugin-specific config
+        location_config = self.config.get("location", {})
+        timezone_str = location_config.get("timezone") if isinstance(location_config, dict) else None
+        
+        # If not in plugin config, try to get from main LEDMatrix config
+        if not timezone_str:
+            timezone_str = self._get_global_timezone()
+        
+        # Fallback to UTC if still not found
+        if not timezone_str:
+            timezone_str = "UTC"
+        
         try:
             self.timezone = pytz.timezone(timezone_str)
+            self.logger.debug(f"Using timezone: {timezone_str}")
         except pytz.exceptions.UnknownTimeZoneError:
             self.logger.warning(f"Unknown timezone '{timezone_str}', using UTC")
             self.timezone = pytz.UTC
+    
+    def _get_global_timezone(self) -> str:
+        """Get the global timezone from the main LEDMatrix config."""
+        try:
+            # Access the main config through the plugin manager's config_manager
+            if hasattr(self.plugin_manager, 'config_manager') and self.plugin_manager.config_manager:
+                main_config = self.plugin_manager.config_manager.load_config()
+                return main_config.get('timezone', 'UTC')
+        except Exception as e:
+            self.logger.debug(f"Could not load timezone from main config: {e}")
+        return None
 
     def _load_number_images(self) -> Dict[int, Image.Image]:
         """Load all number digit images (0-9)."""
@@ -418,14 +440,14 @@ class SevenSegmentClockPlugin(BasePlugin):
         if not isinstance(color, str) or not color.startswith("#"):
             self.logger.warning("color should be a hex color (e.g., #FFFFFF)")
 
-        # Check timezone if location config is provided
+        # Check timezone if location config is provided (optional - will inherit from main config if not specified)
         location = self.config.get("location", {})
         if isinstance(location, dict) and "timezone" in location:
             timezone_str = location.get("timezone")
             try:
                 pytz.timezone(timezone_str)
             except pytz.exceptions.UnknownTimeZoneError:
-                self.logger.warning(f"Unknown timezone '{timezone_str}', will use UTC")
+                self.logger.warning(f"Unknown timezone '{timezone_str}', will fall back to main config or UTC")
 
         return True
 
