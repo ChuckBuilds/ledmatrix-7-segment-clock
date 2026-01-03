@@ -38,6 +38,7 @@ class SevenSegmentClockPlugin(BasePlugin):
         self.has_leading_zero = config.get("has_leading_zero", False)
         self.has_flashing_separator = config.get("has_flashing_separator", True)
         self.color = self._hex_to_rgb(config.get("color", "#FFFFFF"))
+        self.digit_spacing = config.get("digit_spacing", 2)  # Pixels between digits
 
         # Initialize timezone (inherits from main config if not specified)
         self._init_timezone()
@@ -404,21 +405,41 @@ class SevenSegmentClockPlugin(BasePlugin):
             scaled_separator_width = int(self.separator_width * scale)
             scaled_separator_height = int(self.separator_height * scale)
 
-            # Calculate total width with scaling
+            # Calculate total width with scaling and spacing
+            # Add spacing between digits (but not before first or after last)
             total_width = 0
+            digit_count = sum(1 for item in digits if item is not None and item != ":")
+            separator_count = sum(1 for item in digits if item == ":")
+            
             for item in digits:
                 if item == ":":
                     total_width += scaled_separator_width
                 elif item is not None:
                     total_width += scaled_digit_width
+            
+            # Add spacing between digits (not separators)
+            # Spacing goes between consecutive digits
+            if digit_count > 1:
+                # Count gaps between digits (not around separators)
+                spacing_gaps = 0
+                prev_was_digit = False
+                for item in digits:
+                    if item is not None and item != ":":
+                        if prev_was_digit:
+                            spacing_gaps += 1
+                        prev_was_digit = True
+                    else:
+                        prev_was_digit = False
+                total_width += spacing_gaps * int(self.digit_spacing * scale)
 
             # Calculate starting X position to center the display
             start_x = (display_width - total_width) // 2
             # Center vertically
             start_y = (display_height - scaled_digit_height) // 2
 
-            # Render each digit/separator with scaling
+            # Render each digit/separator with scaling and spacing
             current_x = start_x
+            prev_was_digit = False
             for item in digits:
                 if item == ":":
                     # Render separator
@@ -430,7 +451,12 @@ class SevenSegmentClockPlugin(BasePlugin):
                             sep_img, (current_x, paste_y), sep_img
                         )
                         current_x += scaled_separator_width
+                    prev_was_digit = False
                 elif item is not None:
+                    # Add spacing before digit if previous was also a digit
+                    if prev_was_digit:
+                        current_x += int(self.digit_spacing * scale)
+                    
                     # Render digit
                     digit_img = self._render_digit(item, self.color, scale)
                     if digit_img:
@@ -439,6 +465,7 @@ class SevenSegmentClockPlugin(BasePlugin):
                             digit_img, (current_x, start_y), digit_img
                         )
                         current_x += scaled_digit_width
+                    prev_was_digit = True
 
             # Update the display
             self.display_manager.update_display()

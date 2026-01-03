@@ -45,6 +45,14 @@
       "title": "Flashing Separator",
       "description": "Enable blinking separator (colon) between hours and minutes"
     },
+    "digit_spacing": {
+      "type": "number",
+      "default": 2,
+      "minimum": 0,
+      "maximum": 10,
+      "title": "Digit Spacing",
+      "description": "Number of pixels between digits (helps readability)"
+    },
     "color": {
       "type": "string",
       "default": "#FFFFFF",
