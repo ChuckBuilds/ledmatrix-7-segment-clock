@@ -23,7 +23,13 @@ The plugin can be installed via the LEDMatrix web interface plugin store.
 1. Clone or download this repository to your LEDMatrix `plugins/` directory:
    ```bash
    cd /path/to/LEDMatrix/plugins
-   git clone <repository-url> 7-segment-clock
+   git clone --recurse-submodules <repository-url> 7-segment-clock
+   ```
+   
+   **Note**: If you've already cloned without submodules, initialize them with:
+   ```bash
+   cd 7-segment-clock
+   git submodule update --init --recursive
    ```
 
 2. Install dependencies:
