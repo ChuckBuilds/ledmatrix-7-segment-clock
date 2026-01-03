@@ -48,6 +48,8 @@ class SevenSegmentClockPlugin(BasePlugin):
 
         # State variables (updated in update(), used in display())
         self.current_time: Optional[datetime] = None
+        self.last_displayed_time_str: Optional[str] = None
+        self.first_display: bool = True
 
         # Image dimensions (from loaded images)
         self.digit_width = 13
@@ -196,26 +198,30 @@ class SevenSegmentClockPlugin(BasePlugin):
         # Get the base image (transparent foreground on black background)
         base_image = self.number_images[digit].copy()
 
-        # Create a colored version
-        # The TronbyT images have transparent pixels for the "lit" segments
-        # We need to replace non-transparent, non-black pixels with the desired color
-        colored_image = Image.new("RGBA", base_image.size, (0, 0, 0, 255))
+        # Create a colored version with transparent background
+        # The images have white/colored pixels for lit segments on transparent/black background
+        colored_image = Image.new("RGBA", base_image.size, (0, 0, 0, 0))
         
-        # Apply color to visible pixels (non-transparent, non-black)
+        # Apply color to visible pixels (non-transparent pixels that represent lit segments)
         for x in range(base_image.width):
             for y in range(base_image.height):
                 pixel = base_image.getpixel((x, y))
                 if len(pixel) == 4:  # RGBA
                     r, g, b, a = pixel
-                    # If pixel has alpha and is not black, apply the color
+                    # If pixel has any alpha and is not pure black, it's a lit segment
+                    # Apply the configured color to lit segments
                     if a > 0 and (r, g, b) != (0, 0, 0):
-                        # Apply color while preserving alpha
-                        colored_image.putpixel((x, y), (*color, a))
+                        # This is a lit segment - apply the configured color with full opacity
+                        colored_image.putpixel((x, y), (*color, 255))
                     else:
-                        # Keep black/transparent pixels as-is
-                        colored_image.putpixel((x, y), pixel)
+                        # Black or transparent pixel - keep fully transparent
+                        colored_image.putpixel((x, y), (0, 0, 0, 0))
                 else:
-                    colored_image.putpixel((x, y), pixel)
+                    # Not RGBA format - convert and handle
+                    if pixel != (0, 0, 0):  # Not black
+                        colored_image.putpixel((x, y), (*color, 255))
+                    else:
+                        colored_image.putpixel((x, y), (0, 0, 0, 0))
 
         # Scale the image if needed
         if scale != 1.0:
@@ -252,21 +258,26 @@ class SevenSegmentClockPlugin(BasePlugin):
 
         # Similar to digit rendering
         base_image = self.separator_image.copy()
-        colored_image = Image.new("RGBA", base_image.size, (0, 0, 0, 255))
+        colored_image = Image.new("RGBA", base_image.size, (0, 0, 0, 0))
 
         for x in range(base_image.width):
             for y in range(base_image.height):
                 pixel = base_image.getpixel((x, y))
                 if len(pixel) == 4:  # RGBA
                     r, g, b, a = pixel
-                    # If pixel has alpha and is not black, apply the color
+                    # If pixel has any alpha and is not pure black, it's a lit segment
                     if a > 0 and (r, g, b) != (0, 0, 0):
-                        colored_image.putpixel((x, y), (*color, a))
+                        # This is a lit segment - apply the configured color with full opacity
+                        colored_image.putpixel((x, y), (*color, 255))
                     else:
-                        # Keep black/transparent pixels as-is
-                        colored_image.putpixel((x, y), pixel)
+                        # Black or transparent pixel - keep fully transparent
+                        colored_image.putpixel((x, y), (0, 0, 0, 0))
                 else:
-                    colored_image.putpixel((x, y), pixel)
+                    # Not RGBA format - convert and handle
+                    if pixel != (0, 0, 0):  # Not black
+                        colored_image.putpixel((x, y), (*color, 255))
+                    else:
+                        colored_image.putpixel((x, y), (0, 0, 0, 0))
 
         # Scale the image if needed
         if scale != 1.0:
@@ -344,15 +355,25 @@ class SevenSegmentClockPlugin(BasePlugin):
     def display(self, force_clear: bool = False) -> None:
         """Render the 7-segment clock display."""
         try:
-            if force_clear:
-                self.display_manager.clear()
-
             # Use cached time and color from update()
             if self.current_time is None:
                 self.update()
 
             # Format time string
             time_str, separator_visible = self._format_time(self.current_time)
+            
+            # Check if time has changed (only compare HH:MM, not seconds)
+            time_changed = (time_str != self.last_displayed_time_str)
+            
+            # Clear display on first display, force_clear, or when time changes
+            should_clear = self.first_display or force_clear or time_changed
+            
+            if should_clear:
+                self.display_manager.clear()
+                if self.first_display:
+                    self.first_display = False
+                if time_changed:
+                    self.last_displayed_time_str = time_str
 
             # Get display dimensions
             display_width = self.display_manager.width
@@ -403,7 +424,7 @@ class SevenSegmentClockPlugin(BasePlugin):
                     # Render separator
                     sep_img = self._render_separator(self.color, scale)
                     if sep_img:
-                        # Paste onto display image
+                        # Paste onto display image with alpha blending
                         paste_y = start_y + (scaled_digit_height - scaled_separator_height) // 2
                         self.display_manager.image.paste(
                             sep_img, (current_x, paste_y), sep_img
@@ -413,6 +434,7 @@ class SevenSegmentClockPlugin(BasePlugin):
                     # Render digit
                     digit_img = self._render_digit(item, self.color, scale)
                     if digit_img:
+                        # Paste onto display image with alpha blending
                         self.display_manager.image.paste(
                             digit_img, (current_x, start_y), digit_img
                         )
